@@ -1,0 +1,5 @@
+cohort,n,positive_rate,best_item_sum_threshold,rule_label_agreement,false_positives,false_negatives,exact_rule_dependency
+toddler,1054,0.6907020872865275,4,1.0,0,0,True
+child,290,0.4827586206896552,7,1.0,0,0,True
+adolescent,103,0.6019417475728155,7,1.0,0,0,True
+adult,699,0.2675250357653791,7,1.0,0,0,True

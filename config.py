@@ -1,7 +1,12 @@
 SEED = 42
-
 N_REPEATS = 10
-REPEAT_SEEDS = [SEED + repeat for repeat in range(N_REPEATS)]
+REPEAT_SEEDS = [
+    SEED + repeat
+    for repeat in range(N_REPEATS)
+]
+
+N_OUTER_FOLDS = 5
+N_INNER_FOLDS = 5
 
 TRAIN_FRAC = 0.60
 CALIB_FRAC = 0.20

@@ -30,3 +30,16 @@ def test_evaluation_configuration():
     assert config.ECE_PRIMARY_N_BINS == 5
     assert config.ECE_SENSITIVITY_N_BINS == 10
     assert config.CONFIDENCE_LEVEL == 0.95
+
+def test_nested_cross_validation_configuration():
+    assert config.N_REPEATS == 10
+    assert config.N_OUTER_FOLDS == 5
+    assert config.N_INNER_FOLDS == 5
+
+    assert len(
+        config.REPEAT_SEEDS
+    ) == config.N_REPEATS
+
+    assert len(
+        set(config.REPEAT_SEEDS)
+    ) == config.N_REPEATS

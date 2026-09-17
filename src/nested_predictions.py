@@ -13,15 +13,22 @@ from src.feature_pipeline import (
     load_processed_cohort,
 )
 from src.models_classical import (
-    SCALE_NUMERIC_MODELS,
+    SCALE_NUMERIC_MODELS as CLASSICAL_SCALE_MODELS,
     build_model,
     fit_model,
     predict_probabilities,
+)
+from src.models_ensemble import (
+    SCALE_NUMERIC_MODELS as ENSEMBLE_SCALE_MODELS,
+    build_ensemble_model,
+    fit_ensemble_model,
+    predict_ensemble_probabilities,
 )
 from src.utils import (
     set_seed,
     validate_cohort,
     validate_labels,
+    validate_model,
     validate_probabilities,
 )
 
@@ -35,10 +42,24 @@ def fit_and_predict(
 ):
     set_seed(seed)
 
-    scale_numeric = (
-        model_name
-        in SCALE_NUMERIC_MODELS
-    )
+    if model_name in (
+        config.MODELS_CLASSICAL
+    ):
+        scale_numeric = (
+            model_name
+            in CLASSICAL_SCALE_MODELS
+        )
+    elif model_name in (
+        config.MODELS_ENSEMBLE
+    ):
+        scale_numeric = (
+            model_name
+            in ENSEMBLE_SCALE_MODELS
+        )
+    else:
+        raise ValueError(
+            f"Unknown model: {model_name}"
+        )
 
     preprocessor = build_preprocessor(
         scale_numeric=scale_numeric
@@ -56,23 +77,52 @@ def fit_and_predict(
         )
     )
 
-    model = build_model(
-        model_name=model_name,
-        seed=seed,
-    )
+    if model_name in (
+        config.MODELS_CLASSICAL
+    ):
+        model = build_model(
+            model_name=model_name,
+            seed=seed,
+        )
 
-    model = fit_model(
-        model=model,
-        model_name=model_name,
-        X_train=transformed_train,
-        y_train=y_train,
-    )
+        model = fit_model(
+            model=model,
+            model_name=model_name,
+            X_train=transformed_train,
+            y_train=y_train,
+        )
 
-    probabilities = predict_probabilities(
-        model=model,
-        model_name=model_name,
-        features=transformed_predict,
-    )
+        probabilities = (
+            predict_probabilities(
+                model=model,
+                model_name=model_name,
+                features=(
+                    transformed_predict
+                ),
+            )
+        )
+    else:
+        model = build_ensemble_model(
+            model_name=model_name,
+            seed=seed,
+            y_train=y_train,
+        )
+
+        model = fit_ensemble_model(
+            model=model,
+            model_name=model_name,
+            X_train=transformed_train,
+            y_train=y_train,
+        )
+
+        probabilities = (
+            predict_ensemble_probabilities(
+                model=model,
+                features=(
+                    transformed_predict
+                ),
+            )
+        )
 
     return validate_probabilities(
         probabilities
@@ -86,16 +136,9 @@ def generate_nested_predictions(
     outer_fold,
 ):
     validate_cohort(cohort)
+    validate_model(model_name)
     validate_repeat(repeat)
     validate_outer_fold(outer_fold)
-
-    if model_name not in (
-        config.MODELS_CLASSICAL
-    ):
-        raise ValueError(
-            f"{model_name} is not a "
-            "classical model"
-        )
 
     df = load_processed_cohort(cohort)
 
@@ -226,12 +269,14 @@ def generate_nested_predictions(
         + outer_fold
     )
 
-    test_probabilities = fit_and_predict(
-        X_train=X_development,
-        y_train=y_development,
-        X_predict=X_test,
-        model_name=model_name,
-        seed=final_seed,
+    test_probabilities = (
+        fit_and_predict(
+            X_train=X_development,
+            y_train=y_development,
+            X_predict=X_test,
+            model_name=model_name,
+            seed=final_seed,
+        )
     )
 
     return {

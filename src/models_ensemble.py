@@ -1,135 +1,157 @@
-"""
-models_ensemble.py
-Trains the ensemble models (XGBoost, AdaBoost, MLP) per cohort per fold,
-using the pre-built train/calib/test splits from Phase 1. Saves raw
-(uncalibrated) probabilities via utils.save_probs() for later calibration.
-
-Imbalance handling (per the project's agreed decision - no SMOTE):
-  - XGBoost: scale_pos_weight computed per training fold
-  - AdaBoost: sklearn's AdaBoostClassifier has no class_weight param, so we
-    give it a weak learner (depth-1 tree) with class_weight='balanced'
-  - MLP: sklearn's MLPClassifier supports neither class_weight nor
-    sample_weight - this is a known, documented limitation, left as-is
-    rather than working around it with resampling (which would reintroduce
-    the SMOTE-style distortion we explicitly decided against)
-
-Run with: python src/models_ensemble.py
-"""
-
-import os
-import sys
-import pickle
 import numpy as np
-import pandas as pd
-
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.neural_network import MLPClassifier
-from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import (
+    AdaBoostClassifier,
+)
+from sklearn.neural_network import (
+    MLPClassifier,
+)
+from sklearn.tree import (
+    DecisionTreeClassifier,
+)
+from sklearn.utils.class_weight import (
+    compute_sample_weight,
+)
 from xgboost import XGBClassifier
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import config as cfg
-import utils
-
-# models sensitive to feature scale (age ranges ~5-90 while every other
-# feature is 0/1 binary/one-hot) - gradient-based models need scaling,
-# tree-based models (xgb, adaboost) are scale-invariant and don't
-SCALE_SENSITIVE_MODELS = {"mlp"}
+import config
 
 
-def load_cohort_data(cohort):
-    df = pd.read_csv(os.path.join(cfg.PATH_PROCESSED, f"{cohort}_clean.csv"))
-    y = df["class_asd"].astype(int).values
-    X = df.drop(columns=["class_asd"]).astype(float).values
-    return X, y
+SCALE_NUMERIC_MODELS = {
+    "mlp",
+}
 
 
-def load_fold_split(cohort, fold):
-    path = os.path.join(cfg.PATH_SPLITS, f"{cohort}_fold{fold}.pkl")
-    with open(path, "rb") as f:
-        return pickle.load(f)
+def validate_training_labels(
+    y_train,
+):
+    y_train = np.asarray(
+        y_train,
+        dtype=int,
+    ).reshape(-1)
+
+    classes, counts = np.unique(
+        y_train,
+        return_counts=True,
+    )
+
+    if not np.array_equal(
+        classes,
+        np.array([0, 1]),
+    ):
+        raise ValueError(
+            "Training labels must contain "
+            "both binary classes"
+        )
+
+    return y_train, counts
 
 
-def build_model(name, y_train):
-    if name == "xgb":
-        n_pos = y_train.sum()
-        n_neg = len(y_train) - n_pos
-        scale_pos_weight = n_neg / max(n_pos, 1)
+def build_ensemble_model(
+    model_name,
+    seed,
+    y_train,
+):
+    y_train, counts = (
+        validate_training_labels(
+            y_train
+        )
+    )
+
+    if model_name == "xgb":
+        negative_count = counts[0]
+        positive_count = counts[1]
+
+        scale_pos_weight = (
+            negative_count
+            / positive_count
+        )
+
         return XGBClassifier(
-            scale_pos_weight=scale_pos_weight,
-            random_state=cfg.SEED,
+            n_estimators=300,
+            max_depth=3,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            scale_pos_weight=(
+                scale_pos_weight
+            ),
+            objective="binary:logistic",
             eval_metric="logloss",
+            tree_method="hist",
+            random_state=seed,
+            n_jobs=-1,
         )
-    elif name == "adaboost":
-        weak_learner = DecisionTreeClassifier(
-            max_depth=1, class_weight="balanced", random_state=cfg.SEED
+
+    if model_name == "adaboost":
+        weak_learner = (
+            DecisionTreeClassifier(
+                max_depth=1,
+                class_weight="balanced",
+                random_state=seed,
+            )
         )
-        return AdaBoostClassifier(estimator=weak_learner, random_state=cfg.SEED)
-    elif name == "mlp":
+
+        return AdaBoostClassifier(
+            estimator=weak_learner,
+            n_estimators=200,
+            learning_rate=0.05,
+            random_state=seed,
+        )
+
+    if model_name == "mlp":
         return MLPClassifier(
             hidden_layer_sizes=(32, 16),
+            activation="relu",
+            solver="adam",
+            alpha=1e-4,
+            learning_rate_init=1e-3,
             max_iter=2000,
             early_stopping=True,
+            validation_fraction=0.15,
             n_iter_no_change=20,
-            random_state=cfg.SEED,
+            random_state=seed,
         )
-    else:
-        raise ValueError(f"Unknown ensemble model name: {name}")
+
+    raise ValueError(
+        f"Unknown ensemble model: "
+        f"{model_name}"
+    )
 
 
-def train_and_save(cohort, model_name, fold):
-    X, y = load_cohort_data(cohort)
-    splits = load_fold_split(cohort, fold)
-    train_idx = splits["train_idx"]
-    calib_idx = splits["calib_idx"]
-    test_idx = splits["test_idx"]
+def fit_ensemble_model(
+    model,
+    model_name,
+    X_train,
+    y_train,
+):
+    if model_name == "mlp":
+        sample_weights = (
+            compute_sample_weight(
+                class_weight="balanced",
+                y=y_train,
+            )
+        )
 
-    X_train, y_train = X[train_idx], y[train_idx]
-    X_calib, y_calib = X[calib_idx], y[calib_idx]
-    X_test, y_test = X[test_idx], y[test_idx]
+        model.fit(
+            X_train,
+            y_train,
+            sample_weight=sample_weights,
+        )
 
-    if model_name in SCALE_SENSITIVE_MODELS:
-        scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_train)   # fit on train fold only
-        X_calib = scaler.transform(X_calib)
-        X_test = scaler.transform(X_test)
+        return model
 
-    model = build_model(model_name, y_train)
-    model.fit(X_train, y_train)
+    model.fit(
+        X_train,
+        y_train,
+    )
 
-    calib_probs = model.predict_proba(X_calib)[:, 1]
-    test_probs = model.predict_proba(X_test)[:, 1]
-
-    utils.save_probs(cohort, model_name, fold, "calib", calib_probs, y_calib)
-    utils.save_probs(cohort, model_name, fold, "test", test_probs, y_test)
-
-    # sanity-check diagnostic only - NOT the project's actual reported metric
-    # (that is calibration error, computed later in Phase 4). This just
-    # catches a model that silently failed to learn anything (~50% accuracy
-    # on a roughly balanced cohort would be a red flag worth investigating).
-    test_preds = (test_probs >= 0.5).astype(int)
-    accuracy = (test_preds == y_test).mean()
-    return accuracy
+    return model
 
 
-def main():
-    utils.set_seed()
-    for cohort in cfg.COHORTS:
-        print(f"\nCohort: {cohort}")
-        for model_name in cfg.MODELS_ENSEMBLE:
-            fold_accuracies = []
-            for fold in range(cfg.N_FOLDS):
-                acc = train_and_save(cohort, model_name, fold)
-                fold_accuracies.append(acc)
-            mean_acc = sum(fold_accuracies) / len(fold_accuracies)
-            print(f"  {model_name}: done ({cfg.N_FOLDS} folds) "
-                  f"- sanity-check test accuracy (uncalibrated, threshold 0.5): {mean_acc:.1%}")
-
-    print("\nAll ensemble models trained and predictions saved to predictions/")
-    print("Note: accuracy above is a sanity check only. The project's actual")
-    print("reported metrics (ECE/MCE/Brier) come from Phase 4 evaluation.")
-
-
-if __name__ == "__main__":
-    main()
+def predict_ensemble_probabilities(
+    model,
+    features,
+):
+    return model.predict_proba(
+        features
+    )[:, 1]

@@ -132,11 +132,76 @@ def test_nested_predictions_are_deterministic():
     )
 
 
-def test_ensemble_model_is_rejected():
+@pytest.mark.parametrize(
+    "model_name",
+    config.MODELS_ENSEMBLE,
+)
+def test_nested_ensemble_predictions(
+    model_name,
+):
+    result = generate_nested_predictions(
+        cohort="adolescent",
+        model_name=model_name,
+        repeat=0,
+        outer_fold=0,
+    )
+
+    assert len(
+        result[
+            "calibration_probabilities"
+        ]
+    ) == len(
+        result["development_idx"]
+    )
+
+    assert len(
+        result["test_probabilities"]
+    ) == len(
+        result["test_idx"]
+    )
+
+    assert np.isfinite(
+        result[
+            "calibration_probabilities"
+        ]
+    ).all()
+
+    assert np.isfinite(
+        result["test_probabilities"]
+    ).all()
+
+    assert (
+        (
+            result[
+                "calibration_probabilities"
+            ]
+            >= 0
+        )
+        & (
+            result[
+                "calibration_probabilities"
+            ]
+            <= 1
+        )
+    ).all()
+
+    assert (
+        (
+            result["test_probabilities"]
+            >= 0
+        )
+        & (
+            result["test_probabilities"]
+            <= 1
+        )
+    ).all()
+
+
+def test_unknown_model_is_rejected():
     with pytest.raises(ValueError):
         generate_nested_predictions(
             cohort="adult",
-            model_name="xgb",
+            model_name="unknown",
             repeat=0,
             outer_fold=0,
         )

@@ -13,3 +13,6 @@ results/reliability_diagrams/*.png
 .pytest_cache/
 .DS_Store
 data/processed/*.csv
+
+# Generated nested cross-validation predictions
+predictions/nested/

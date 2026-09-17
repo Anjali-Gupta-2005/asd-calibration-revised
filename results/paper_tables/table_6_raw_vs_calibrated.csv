@@ -1,0 +1,21 @@
+Stage,Method,Mean improvement,Median improvement,Models improved,Rank-biserial effect,Holm-adjusted p,Significant
+Toddler,Platt,0.0170,0.0080,8/9,0.956,0.023,Yes
+Toddler,Temperature,0.0126,0.0067,8/9,0.956,0.023,Yes
+Toddler,Histogram,0.0160,0.0068,9/9,1.000,0.020,Yes
+Toddler,Isotonic,0.0170,0.0078,9/9,1.000,0.020,Yes
+Toddler,Beta,0.0171,0.0080,8/9,0.956,0.023,Yes
+Child,Platt,0.0276,0.0173,8/9,0.956,0.023,Yes
+Child,Temperature,0.0254,0.0159,8/9,0.867,0.023,Yes
+Child,Histogram,0.0252,0.0157,8/9,0.956,0.023,Yes
+Child,Isotonic,0.0282,0.0241,9/9,1.000,0.020,Yes
+Child,Beta,0.0290,0.0184,9/9,1.000,0.020,Yes
+Adolescent,Platt,0.0294,0.0261,8/9,0.911,0.047,Yes
+Adolescent,Temperature,0.0259,0.0163,9/9,1.000,0.020,Yes
+Adolescent,Histogram,0.0148,0.0117,6/9,0.511,0.203,No
+Adolescent,Isotonic,0.0248,0.0245,7/9,0.822,0.055,No
+Adolescent,Beta,0.0288,0.0254,8/9,0.911,0.047,Yes
+Adult,Platt,0.0163,0.0074,8/9,0.956,0.031,Yes
+Adult,Temperature,0.0112,0.0063,8/9,0.911,0.031,Yes
+Adult,Histogram,0.0146,0.0066,8/9,0.867,0.031,Yes
+Adult,Isotonic,0.0155,0.0068,9/9,1.000,0.020,Yes
+Adult,Beta,0.0163,0.0077,8/9,0.956,0.031,Yes

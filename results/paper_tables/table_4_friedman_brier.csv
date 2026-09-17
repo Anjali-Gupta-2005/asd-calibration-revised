@@ -1,0 +1,5 @@
+Stage,Friedman χ²,Kendall's W,Holm-adjusted p,Significant
+Toddler,20.800,0.578,<0.001,Yes
+Child,12.978,0.360,0.011,Yes
+Adolescent,23.911,0.664,<0.001,Yes
+Adult,22.933,0.637,<0.001,Yes

@@ -1,0 +1,12 @@
+Stage,Method A,Method B,Better-ranked method,Nemenyi p
+Toddler,Platt,Temperature,Platt,0.001
+Toddler,Temperature,Beta,Beta,0.005
+Child,Platt,Histogram,Platt,0.015
+Child,Histogram,Beta,Beta,0.024
+Adolescent,Platt,Histogram,Platt,<0.001
+Adolescent,Temperature,Histogram,Temperature,0.005
+Adolescent,Histogram,Beta,Beta,0.002
+Adult,Platt,Temperature,Platt,0.002
+Adult,Platt,Histogram,Platt,0.015
+Adult,Temperature,Beta,Beta,0.003
+Adult,Histogram,Beta,Beta,0.024

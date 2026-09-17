@@ -10,5 +10,5 @@ calibrated_predictions/*.npy
 split_indices/*.pkl
 results/reliability_diagrams/*.png
 
-data/raw/*
-!data/raw/README.md
+.pytest_cache/
+.DS_Store

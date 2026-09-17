@@ -1,76 +1,321 @@
-"""
-utils.py
-Shared helper functions used by every phase (model training, calibration,
-evaluation). This is the "contract" both of you write to/read from, so
-neither person needs to know how the other's code works internally.
-
-Import with: from src import utils   (or "import utils" if run from inside src/)
-"""
-
-import os
 import random
+from pathlib import Path
+
 import numpy as np
 
-import config as cfg
-import pandas as pd
-import pickle
-from config import PATH_PROCESSED, PATH_SPLITS
+import config
 
-def set_seed(seed=cfg.SEED):
-    """Sets every relevant random seed. Call this at the top of every script."""
+
+VALID_SLICES = {
+    "calib",
+    "test",
+}
+
+
+def set_seed(seed=config.SEED):
     random.seed(seed)
     np.random.seed(seed)
 
 
-def _check_valid_name(cohort, model):
-    if cohort not in cfg.COHORTS:
-        raise ValueError(f"'{cohort}' is not a recognized cohort. Use one of {cfg.COHORTS}")
-    if model not in cfg.ALL_MODELS:
-        raise ValueError(f"'{model}' is not a recognized model. Use one of {cfg.ALL_MODELS}")
+def validate_cohort(cohort):
+    if cohort not in config.COHORTS:
+        raise ValueError(
+            f"Unknown cohort: {cohort}"
+        )
 
 
-def save_probs(cohort, model, fold, slice_name, probs, labels):
-    """Saves raw (uncalibrated) model probabilities + true labels.
-    slice_name must be 'calib' or 'test'."""
-    _check_valid_name(cohort, model)
-    if slice_name not in ("calib", "test"):
-        raise ValueError("slice_name must be 'calib' or 'test'")
-
-    os.makedirs(cfg.PATH_PREDICTIONS, exist_ok=True)
-    base = f"{cohort}_{model}_fold{fold}_{slice_name}slice"
-    np.save(os.path.join(cfg.PATH_PREDICTIONS, f"{base}_probs.npy"), np.asarray(probs))
-    np.save(os.path.join(cfg.PATH_PREDICTIONS, f"{base}_labels.npy"), np.asarray(labels))
+def validate_model(model):
+    if model not in config.ALL_MODELS:
+        raise ValueError(
+            f"Unknown model: {model}"
+        )
 
 
-def load_probs(cohort, model, fold, slice_name):
-    """Returns (probs, labels) - inverse of save_probs."""
-    _check_valid_name(cohort, model)
-    base = f"{cohort}_{model}_fold{fold}_{slice_name}slice"
-    probs = np.load(os.path.join(cfg.PATH_PREDICTIONS, f"{base}_probs.npy"))
-    labels = np.load(os.path.join(cfg.PATH_PREDICTIONS, f"{base}_labels.npy"))
-    return probs, labels
+def validate_method(method):
+    if method not in config.ALL_METHODS:
+        raise ValueError(
+            f"Unknown calibration method: "
+            f"{method}"
+        )
 
 
-def save_calibrated_probs(cohort, model, method, fold, probs):
-    """Saves calibrated test-slice probabilities for one (cohort, model, method, fold)."""
-    _check_valid_name(cohort, model)
-    if method not in cfg.ALL_METHODS:
-        raise ValueError(f"'{method}' is not a recognized calibration method. Use one of {cfg.ALL_METHODS}")
+def validate_repeat(repeat):
+    if not isinstance(repeat, int):
+        raise TypeError(
+            "repeat must be an integer"
+        )
 
-    os.makedirs(cfg.PATH_CALIBRATED, exist_ok=True)
-    fname = f"{cohort}_{model}_{method}_fold{fold}_testslice_probs.npy"
-    np.save(os.path.join(cfg.PATH_CALIBRATED, fname), np.asarray(probs))
+    if not 0 <= repeat < config.N_REPEATS:
+        raise ValueError(
+            f"repeat must be between 0 and "
+            f"{config.N_REPEATS - 1}"
+        )
 
 
-def load_calibrated_probs(cohort, model, method, fold):
-    """Returns the calibrated probs array - inverse of save_calibrated_probs."""
-    _check_valid_name(cohort, model)
-    fname = f"{cohort}_{model}_{method}_fold{fold}_testslice_probs.npy"
-    return np.load(os.path.join(cfg.PATH_CALIBRATED, fname))
+def validate_slice(slice_name):
+    if slice_name not in VALID_SLICES:
+        raise ValueError(
+            f"slice_name must be one of "
+            f"{sorted(VALID_SLICES)}"
+        )
 
-def load_fold(cohort, fold):
-    """Loads clean data + split indices for one cohort/fold. Returns (df, idx_dict)."""
-    df = pd.read_csv(f"{PATH_PROCESSED}{cohort}_clean.csv")
-    with open(f"{PATH_SPLITS}{cohort}_fold{fold}.pkl", "rb") as f:
-        idx = pickle.load(f)
-    return df, idx
+
+def validate_probabilities(
+    probabilities,
+):
+    probabilities = np.asarray(
+        probabilities,
+        dtype=float,
+    ).reshape(-1)
+
+    if len(probabilities) == 0:
+        raise ValueError(
+            "Probability array is empty"
+        )
+
+    if not np.isfinite(
+        probabilities
+    ).all():
+        raise ValueError(
+            "Probabilities contain NaN "
+            "or infinity"
+        )
+
+    if (
+        (probabilities < 0).any()
+        or (probabilities > 1).any()
+    ):
+        raise ValueError(
+            "Probabilities must be between "
+            "0 and 1"
+        )
+
+    return probabilities
+
+
+def validate_labels(labels):
+    labels = np.asarray(
+        labels,
+        dtype=int,
+    ).reshape(-1)
+
+    if len(labels) == 0:
+        raise ValueError(
+            "Label array is empty"
+        )
+
+    unique_labels = set(
+        np.unique(labels).tolist()
+    )
+
+    if not unique_labels.issubset(
+        {0, 1}
+    ):
+        raise ValueError(
+            f"Labels must be binary. "
+            f"Found: {sorted(unique_labels)}"
+        )
+
+    return labels
+
+
+def prediction_base_name(
+    cohort,
+    model,
+    repeat,
+    slice_name,
+):
+    validate_cohort(cohort)
+    validate_model(model)
+    validate_repeat(repeat)
+    validate_slice(slice_name)
+
+    return (
+        f"{cohort}_{model}_"
+        f"repeat{repeat}_"
+        f"{slice_name}slice"
+    )
+
+
+def save_probs(
+    cohort,
+    model,
+    repeat,
+    slice_name,
+    probabilities,
+    labels,
+):
+    probabilities = validate_probabilities(
+        probabilities
+    )
+
+    labels = validate_labels(
+        labels
+    )
+
+    if len(probabilities) != len(labels):
+        raise ValueError(
+            "Probability and label lengths "
+            "do not match"
+        )
+
+    output_directory = Path(
+        config.PATH_PREDICTIONS
+    )
+
+    output_directory.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    base_name = prediction_base_name(
+        cohort,
+        model,
+        repeat,
+        slice_name,
+    )
+
+    np.save(
+        output_directory
+        / f"{base_name}_probs.npy",
+        probabilities,
+    )
+
+    np.save(
+        output_directory
+        / f"{base_name}_labels.npy",
+        labels,
+    )
+
+
+def load_probs(
+    cohort,
+    model,
+    repeat,
+    slice_name,
+):
+    base_name = prediction_base_name(
+        cohort,
+        model,
+        repeat,
+        slice_name,
+    )
+
+    input_directory = Path(
+        config.PATH_PREDICTIONS
+    )
+
+    probabilities_path = (
+        input_directory
+        / f"{base_name}_probs.npy"
+    )
+
+    labels_path = (
+        input_directory
+        / f"{base_name}_labels.npy"
+    )
+
+    if not probabilities_path.exists():
+        raise FileNotFoundError(
+            probabilities_path
+        )
+
+    if not labels_path.exists():
+        raise FileNotFoundError(
+            labels_path
+        )
+
+    probabilities = (
+        validate_probabilities(
+            np.load(probabilities_path)
+        )
+    )
+
+    labels = validate_labels(
+        np.load(labels_path)
+    )
+
+    if len(probabilities) != len(labels):
+        raise ValueError(
+            "Stored probability and label "
+            "lengths do not match"
+        )
+
+    return probabilities, labels
+
+
+def calibrated_file_name(
+    cohort,
+    model,
+    method,
+    repeat,
+):
+    validate_cohort(cohort)
+    validate_model(model)
+    validate_method(method)
+    validate_repeat(repeat)
+
+    return (
+        f"{cohort}_{model}_{method}_"
+        f"repeat{repeat}_"
+        f"testslice_probs.npy"
+    )
+
+
+def save_calibrated_probs(
+    cohort,
+    model,
+    method,
+    repeat,
+    probabilities,
+):
+    probabilities = validate_probabilities(
+        probabilities
+    )
+
+    output_directory = Path(
+        config.PATH_CALIBRATED
+    )
+
+    output_directory.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    file_name = calibrated_file_name(
+        cohort,
+        model,
+        method,
+        repeat,
+    )
+
+    np.save(
+        output_directory / file_name,
+        probabilities,
+    )
+
+
+def load_calibrated_probs(
+    cohort,
+    model,
+    method,
+    repeat,
+):
+    file_name = calibrated_file_name(
+        cohort,
+        model,
+        method,
+        repeat,
+    )
+
+    path = (
+        Path(config.PATH_CALIBRATED)
+        / file_name
+    )
+
+    if not path.exists():
+        raise FileNotFoundError(path)
+
+    return validate_probabilities(
+        np.load(path)
+    )

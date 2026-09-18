@@ -6,17 +6,11 @@ def test_repeat_configuration():
     assert config.REPEAT_SEEDS == list(range(42, 52))
 
 
-def test_split_fractions():
-    total = (
-        config.TRAIN_FRAC
-        + config.CALIB_FRAC
-        + config.TEST_FRAC
-    )
-
-    assert total == 1.0
-    assert config.TRAIN_FRAC == 0.60
-    assert config.CALIB_FRAC == 0.20
-    assert config.TEST_FRAC == 0.20
+def test_legacy_holdout_configuration_removed():
+    assert not hasattr(config, "TRAIN_FRAC")
+    assert not hasattr(config, "CALIB_FRAC")
+    assert not hasattr(config, "TEST_FRAC")
+    assert not hasattr(config, "PATH_SPLITS")
 
 
 def test_experiment_dimensions():

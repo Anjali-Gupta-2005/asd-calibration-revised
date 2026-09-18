@@ -49,8 +49,8 @@ The preprocessing pipeline will:
 1. Normalize column names.
 2. Remove target-leakage columns.
 3. Remove exact duplicate records before data splitting.
-4. Create deterministic repeated stratified splits.
-5. Fit imputation, encoding and scaling using training data only.
+4. Leave nested cross-validation splits to be generated deterministically in memory during evaluation.
+5. Fit imputation, encoding and scaling using only the relevant training data.
 
 ## Important limitation
 

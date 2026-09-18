@@ -1,14 +1,9 @@
 import numpy as np
 import pandas as pd
-import pytest
-
 import config
 from src.feature_pipeline import (
-    CATEGORICAL_FEATURES,
     FEATURE_COLUMNS,
     build_preprocessor,
-    load_repeat_data,
-    transform_repeat,
 )
 
 
@@ -137,78 +132,3 @@ def test_unseen_categories_do_not_change_dimensions():
         "unseen" in name
         for name in feature_names
     )
-
-
-@pytest.mark.parametrize(
-    "scale_numeric",
-    [False, True],
-)
-def test_real_repeat_transformation(
-    scale_numeric,
-):
-    transformed = transform_repeat(
-        cohort="adult",
-        repeat=0,
-        scale_numeric=scale_numeric,
-    )
-
-    X_train = transformed[
-        "X_train_transformed"
-    ]
-
-    X_calib = transformed[
-        "X_calib_transformed"
-    ]
-
-    X_test = transformed[
-        "X_test_transformed"
-    ]
-
-    assert X_train.shape[0] == 419
-    assert X_calib.shape[0] == 140
-    assert X_test.shape[0] == 140
-
-    assert (
-        X_train.shape[1]
-        == X_calib.shape[1]
-        == X_test.shape[1]
-    )
-
-    assert np.isfinite(X_train).all()
-    assert np.isfinite(X_calib).all()
-    assert np.isfinite(X_test).all()
-
-
-@pytest.mark.parametrize(
-    "cohort",
-    config.COHORTS,
-)
-def test_repeat_data_lengths(cohort):
-    data = load_repeat_data(
-        cohort,
-        repeat=0,
-    )
-
-    assert len(data["X_train"]) == len(
-        data["y_train"]
-    )
-
-    assert len(data["X_calib"]) == len(
-        data["y_calib"]
-    )
-
-    assert len(data["X_test"]) == len(
-        data["y_test"]
-    )
-
-    assert set(
-        data["y_train"]
-    ) == {0, 1}
-
-    assert set(
-        data["y_calib"]
-    ) == {0, 1}
-
-    assert set(
-        data["y_test"]
-    ) == {0, 1}

@@ -1,10 +1,7 @@
-import pickle
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-
 import config
 
 
@@ -357,115 +354,6 @@ def prepare_cohort(cohort):
     return df
 
 
-def make_repeated_splits(
-    df,
-    cohort,
-):
-    target = df[
-        config.TARGET_COL
-    ].to_numpy()
-
-    all_indices = np.arange(
-        len(df)
-    )
-
-    for repeat, seed in enumerate(
-        config.REPEAT_SEEDS
-    ):
-        train_indices, temporary_indices = (
-            train_test_split(
-                all_indices,
-                test_size=(
-                    config.CALIB_FRAC
-                    + config.TEST_FRAC
-                ),
-                stratify=target,
-                random_state=seed,
-            )
-        )
-
-        temporary_target = target[
-            temporary_indices
-        ]
-
-        (
-            calibration_indices,
-            test_indices,
-        ) = train_test_split(
-            temporary_indices,
-            test_size=(
-                config.TEST_FRAC
-                / (
-                    config.CALIB_FRAC
-                    + config.TEST_FRAC
-                )
-            ),
-            stratify=temporary_target,
-            random_state=seed + 1000,
-        )
-
-        train_set = set(
-            train_indices.tolist()
-        )
-        calibration_set = set(
-            calibration_indices.tolist()
-        )
-        test_set = set(
-            test_indices.tolist()
-        )
-
-        assert train_set.isdisjoint(
-            calibration_set
-        )
-        assert train_set.isdisjoint(
-            test_set
-        )
-        assert calibration_set.isdisjoint(
-            test_set
-        )
-
-        assert (
-            train_set
-            | calibration_set
-            | test_set
-        ) == set(all_indices.tolist())
-
-        split = {
-            "repeat": repeat,
-            "seed": seed,
-            "train_idx": (
-                train_indices.tolist()
-            ),
-            "calib_idx": (
-                calibration_indices.tolist()
-            ),
-            "test_idx": (
-                test_indices.tolist()
-            ),
-        }
-
-        output_path = (
-            Path(config.PATH_SPLITS)
-            / (
-                f"{cohort}_repeat"
-                f"{repeat}.pkl"
-            )
-        )
-
-        with output_path.open("wb") as file:
-            pickle.dump(
-                split,
-                file,
-            )
-
-        print(
-            f"  repeat{repeat}: "
-            f"train={len(train_indices)}, "
-            f"calib={len(calibration_indices)}, "
-            f"test={len(test_indices)}"
-        )
-
-
 def process_cohort(cohort):
     df = prepare_cohort(cohort)
 
@@ -484,22 +372,9 @@ def process_cohort(cohort):
         f"shape={df.shape}"
     )
 
-    make_repeated_splits(
-        df,
-        cohort,
-    )
-
-
 def main():
     Path(
         config.PATH_PROCESSED
-    ).mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    Path(
-        config.PATH_SPLITS
     ).mkdir(
         parents=True,
         exist_ok=True,
@@ -509,8 +384,9 @@ def main():
         process_cohort(cohort)
 
     print(
-        "\nAll cohorts prepared and "
-        "repeated splits generated."
+        "\nAll cohorts prepared. "
+        "Nested splits are generated "
+        "in memory during evaluation."
     )
 
 

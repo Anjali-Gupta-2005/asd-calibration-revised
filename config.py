@@ -8,10 +8,6 @@ REPEAT_SEEDS = [
 N_OUTER_FOLDS = 5
 N_INNER_FOLDS = 5
 
-TRAIN_FRAC = 0.60
-CALIB_FRAC = 0.20
-TEST_FRAC = 0.20
-
 COHORTS = [
     "toddler",
     "child",
@@ -53,7 +49,6 @@ TARGET_COL = "class_asd"
 
 PATH_RAW = "data/raw"
 PATH_PROCESSED = "data/processed"
-PATH_SPLITS = "split_indices"
 PATH_PREDICTIONS = "predictions"
 PATH_CALIBRATED = "calibrated_predictions"
 PATH_RESULTS = "results"

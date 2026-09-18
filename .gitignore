@@ -5,9 +5,6 @@ venv/
 .env
 .ipynb_checkpoints/
 
-predictions/*.npy
-calibrated_predictions/*.npy
-split_indices/*.pkl
 results/reliability_diagrams/*.png
 
 .pytest_cache/
